@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Space Operations Dashboard — Arduino</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+<!-- ═══════════════════════════════════════════════════════════
+     BLOCO 1 · DESIGN TOKENS & VARIÁVEIS CSS
+     ═══════════════════════════════════════════════════════════ -->
+<style>
+:root {
+  --bg:       #080c14;
+  --surface:  #0d1525;
+  --surface2: #121e35;
+  --border:   rgba(56,139,253,0.18);
+  --accent:   #388bfd;
+  --accent2:  #56d364;
+  --danger:   #f85149;
+  --warn:     #e3b341;
+  --text:     #cdd9e5;
+  --text2:    #768390;
+  --mono:     'Space Mono', monospace;
+  --display:  'Syne', sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+
+/* ─── BLOCO 2 · LAYOUT BASE ──────────────────────────────────── */
+body{
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--display);
+  min-height: 100vh;
+  background-image:
+    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(56,139,253,0.12) 0%, transparent 70%),
+    url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23388bfd' fill-opacity='0.03'%3E%3Ccircle cx='30' cy='30' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* ─── BLOCO 3 · HEADER ───────────────────────────────────────── */
+header{
+  border-bottom: 1px solid var(--border);
+  padding: 1.5rem 2rem;
+  display: flex; align-items: center; justify-content: space-between;
+  background: rgba(8,12,20,0.8);
+  backdrop-filter: blur(12px);
+  position: sticky; top: 0; z-index: 100;
+}
+.logo{ display:flex; align-items:center; gap:12px }
+.logo-icon{
+  width:32px; height:32px; border:1.5px solid var(--accent);
+  border-radius:50%; display:flex; align-items:center; justify-content:center;
+}
+.logo-icon svg{ width:18px; height:18px; stroke:var(--accent) }
+.logo-text{ font-size:15px; font-weight:700; letter-spacing:0.08em; color:#fff }
+.logo-sub{ font-size:11px; color:var(--text2); font-family:var(--mono); letter-spacing:0.05em }
+.header-meta{ text-align:right; font-family:var(--mono); font-size:11px; color:var(--text2) }
+.header-meta span{ color:var(--accent) }
+
+/* ─── BLOCO 4 · GRID & CARDS ─────────────────────────────────── */
+main{ max-width:1100px; margin:0 auto; padding:2rem }
+.grid-2{ display:grid; grid-template-columns:1fr 1fr; gap:1.5rem }
+@media(max-width:780px){ .grid-2{ grid-template-columns:1fr } }
+
+.card{
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  position: relative; overflow: hidden;
+}
+.card::before{
+  content:''; position:absolute; top:0; left:0; right:0; height:1px;
+  background: linear-gradient(90deg,transparent,var(--accent),transparent);
+  opacity: 0.4;
+}
+.card-title{
+  font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase;
+  color:var(--text2); margin-bottom:1.25rem; font-family:var(--mono);
+  display:flex; align-items:center; gap:8px;
+}
+.card-title::before{ content:''; width:6px; height:6px; border-radius:50%; background:var(--accent) }
+
+/* ─── BLOCO 5 · CHIPS DE VARIÁVEIS ──────────────────────────── */
+.vars-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px }
+.var-chip{
+  background:var(--surface2); border:1px solid var(--border); border-radius:8px;
+  padding:10px 12px; cursor:pointer; transition:all 0.15s; user-select:none;
+  position:relative; overflow:hidden;
+}
+.var-chip:hover{ border-color:rgba(56,139,253,0.4) }
+.var-chip.active{ border-color:var(--accent); background:rgba(56,139,253,0.08) }
+.var-chip.active .var-val{ color:var(--accent2) }
+.var-letter{ font-size:22px; font-weight:800; color:#fff; line-height:1 }
+.var-desc{ font-size:10px; color:var(--text2); margin-top:3px; line-height:1.3; font-family:var(--mono) }
+.var-val{
+  position:absolute; top:10px; right:12px;
+  font-size:20px; font-weight:700; font-family:var(--mono);
+  color:var(--text2); transition:color 0.15s;
+}
+
+/* ─── BLOCO 6 · PAINEL DE ALERTA ────────────────────────────── */
+.alert-panel{
+  border-radius:10px; padding:1.25rem 1.5rem;
+  display:flex; align-items:center; gap:14px;
+  transition:all 0.25s; margin-top:1rem; border:1px solid;
+}
+.alert-ok{ background:rgba(86,211,100,0.06); border-color:rgba(86,211,100,0.25) }
+.alert-on{ background:rgba(248,81,73,0.08);  border-color:rgba(248,81,73,0.35) }
+.alert-dot{ width:14px; height:14px; border-radius:50%; flex-shrink:0; transition:all 0.25s }
+.alert-ok .alert-dot{ background:var(--accent2); box-shadow:0 0 10px var(--accent2) }
+.alert-on .alert-dot{ background:var(--danger); box-shadow:0 0 10px var(--danger); animation:pulse 0.8s infinite }
+@keyframes pulse{ 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.6;transform:scale(1.2)} }
+.alert-text{ font-size:14px; font-weight:600 }
+.alert-ok .alert-text{ color:var(--accent2) }
+.alert-on .alert-text{ color:var(--danger) }
+.alert-sub{ font-size:11px; color:var(--text2); font-family:var(--mono); margin-top:2px }
+.x-value{ margin-left:auto; font-size:28px; font-weight:800; font-family:var(--mono) }
+.alert-ok .x-value{ color:var(--accent2) }
+.alert-on .x-value{ color:var(--danger) }
+
+/* ─── BLOCO 7 · EXPRESSÃO BOOLEANA ──────────────────────────── */
+.expr{
+  font-family:var(--mono); font-size:13px;
+  background:var(--surface2); border:1px solid var(--border); border-radius:8px;
+  padding:14px 16px; line-height:2; word-break:break-word;
+}
+.kw-and{ color:var(--accent) }
+.kw-or{  color:var(--accent2) }
+.kw-not{ color:var(--danger) }
+.kw-x{   color:var(--warn) }
+.gates{ display:flex; flex-wrap:wrap; gap:6px; margin-top:12px }
+.gate{ font-family:var(--mono); font-size:11px; padding:4px 10px; border-radius:5px; font-weight:700 }
+.gate-and{ background:rgba(56,139,253,0.12); color:var(--accent);  border:1px solid rgba(56,139,253,0.3) }
+.gate-or{  background:rgba(86,211,100,0.10); color:var(--accent2); border:1px solid rgba(86,211,100,0.25) }
+.gate-not{ background:rgba(248,81,73,0.10);  color:var(--danger);  border:1px solid rgba(248,81,73,0.25) }
+
+/* ─── BLOCO 8 · ABAS ─────────────────────────────────────────── */
+.tabs{
+  display:flex; gap:4px; margin-bottom:1.25rem;
+  border-bottom:1px solid var(--border); padding-bottom:0;
+}
+.tab{
+  padding:8px 16px; font-size:12px; font-weight:700; letter-spacing:0.06em;
+  text-transform:uppercase; font-family:var(--mono); cursor:pointer;
+  color:var(--text2); border-bottom:2px solid transparent; margin-bottom:-1px;
+  transition:all 0.15s;
+}
+.tab:hover{ color:var(--text) }
+.tab.active{ color:var(--accent); border-bottom-color:var(--accent) }
+.panel{ display:none }
+.panel.active{ display:block }
+
+/* ─── BLOCO 9 · BLOCO DE CÓDIGO ──────────────────────────────── */
+.code-block{
+  background:#0a0f1a; border:1px solid var(--border); border-radius:8px;
+  padding:1.25rem; font-family:var(--mono); font-size:12px; line-height:1.9;
+  overflow-x:auto; white-space:pre; color:var(--text);
+}
+.cm{ color:var(--text2) }
+.kw{ color:var(--accent) }
+.fn{ color:var(--accent2) }
+.str{ color:var(--warn) }
+.num{ color:#f2cc60 }
+
+/* ─── BLOCO 10 · TABELA VERDADE ──────────────────────────────── */
+.tt-scroll{
+  overflow-x:auto; max-height:420px; overflow-y:auto;
+  border-radius:8px; border:1px solid var(--border);
+}
+table{ width:100%; border-collapse:collapse; font-family:var(--mono); font-size:11px }
+thead th{
+  background:var(--surface2); color:var(--text2); font-weight:700;
+  padding:8px 10px; text-align:center; letter-spacing:0.08em;
+  position:sticky; top:0; z-index:1; border-bottom:1px solid var(--border);
+}
+tbody td{
+  padding:6px 10px; text-align:center;
+  border-bottom:1px solid rgba(56,139,253,0.06); color:var(--text2);
+}
+tbody tr.alert{ background:rgba(248,81,73,0.06) }
+tbody tr.alert td{ color:var(--text) }
+tbody tr.alert td.xcell{ color:var(--danger); font-weight:700 }
+tbody tr:not(.alert) td.xcell{ color:var(--accent2); font-weight:700 }
+tbody tr:hover{ background:rgba(56,139,253,0.04) }
+
+/* ─── BLOCO 11 · SVG DO CIRCUITO ─────────────────────────────── */
+.circuit-svg{
+  width:100%; border-radius:8px;
+  background:#080c14; border:1px solid var(--border); display:block;
+}
+
+/* ─── BLOCO 12 · UTILITÁRIOS ─────────────────────────────────── */
+.sect-heading{
+  font-size:11px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase;
+  color:var(--text2); font-family:var(--mono); margin:2rem 0 1rem;
+  display:flex; align-items:center; gap:10px;
+}
+.sect-heading::after{ content:''; flex:1; height:1px; background:var(--border) }
+.full-card{
+  background:var(--surface); border:1px solid var(--border); border-radius:12px;
+  padding:1.5rem; position:relative; overflow:hidden; margin-bottom:1.5rem;
+}
+.full-card::before{
+  content:''; position:absolute; top:0; left:0; right:0; height:1px;
+  background:linear-gradient(90deg,transparent,var(--accent),transparent); opacity:0.4;
+}
+.copy-btn{
+  float:right; font-family:var(--mono); font-size:10px; padding:4px 10px;
+  background:var(--surface2); border:1px solid var(--border); border-radius:5px;
+  color:var(--text2); cursor:pointer; transition:all 0.15s; margin-top:-4px;
+}
+.copy-btn:hover{ border-color:var(--accent); color:var(--accent) }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════
+     BLOCO 13 · HEADER
+     ═══════════════════════════════════════════════════════════ -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2L12 6M12 18L12 22M4.93 4.93L7.76 7.76M16.24 16.24L19.07 19.07M2 12L6 12M18 12L22 12M4.93 19.07L7.76 16.24M16.24 7.76L19.07 4.93"/>
+      </svg>
+    </div>
+    <div>
+      <div class="logo-text">SPACE OPS DASHBOARD</div>
+      <div class="logo-sub">Sistema de Alerta Operacional com Arduino</div>
+    </div>
+  </div>
+  <div class="header-meta">
+    <div>Ciências da Computação · <span>1CC AGO</span> · Prof. <span>Mauricio Neto</span></div>
+    <div style="margin-top:4px;display:flex;gap:16px;justify-content:flex-end">
+      <span>João Carmo <span style="color:var(--accent2)">RM567030</span></span>
+      <span>Luiz Gustavo <span style="color:var(--accent2)">RM566613</span></span>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<!-- ═══════════════════════════════════════════════════════════
+     BLOCO 14 · GRID SUPERIOR — SIMULADOR + EXPRESSÃO
+     ═══════════════════════════════════════════════════════════ -->
+<div class="grid-2" style="margin-top:0.5rem">
+
+  <!-- Entradas operacionais -->
+  <div class="card">
+    <div class="card-title">Entradas Operacionais — clique para simular</div>
+    <div class="vars-grid" id="varGrid">
+      <div class="var-chip" onclick="toggle('A')" id="chipA">
+        <div class="var-letter">A</div>
+        <div class="var-desc">Falha de comunicação</div>
+        <div class="var-val" id="valA">0</div>
+      </div>
+      <div class="var-chip" onclick="toggle('B')" id="chipB">
+        <div class="var-letter">B</div>
+        <div class="var-desc">Temperatura crítica</div>
+        <div class="var-val" id="valB">0</div>
+      </div>
+      <div class="var-chip" onclick="toggle('C')" id="chipC">
+        <div class="var-letter">C</div>
+        <div class="var-desc">Baixo nível de energia</div>
+        <div class="var-val" id="valC">0</div>
+      </div>
+      <div class="var-chip" onclick="toggle('D')" id="chipD">
+        <div class="var-letter">D</div>
+        <div class="var-desc">Falha em módulo operacional</div>
+        <div class="var-val" id="valD">0</div>
+      </div>
+      <div class="var-chip" onclick="toggle('E')" id="chipE">
+        <div class="var-letter">E</div>
+        <div class="var-desc">Instabilidade da nave</div>
+        <div class="var-val" id="valE">0</div>
+      </div>
+      <div class="var-chip" onclick="toggle('F')" id="chipF">
+        <div class="var-letter">F</div>
+        <div class="var-desc">Alerta sistema inteligente</div>
+        <div class="var-val" id="valF">0</div>
+      </div>
+    </div>
+
+    <!-- Painel de alerta com indicadores de LED -->
+    <div class="alert-panel alert-ok" id="alertPanel">
+      <div class="alert-dot"></div>
+      <div>
+        <div class="alert-text" id="alertText">Operação Normal</div>
+        <div class="alert-sub" id="alertSub">Nenhuma condição crítica detectada</div>
+      </div>
+      <div class="x-value" id="xValue">X=0</div>
+    </div>
+
+    <!-- Indicadores de LED — espelha o Tinkercad -->
+    <div style="display:flex;gap:12px;margin-top:12px">
+      <div id="ledVerde" style="
+        display:flex;align-items:center;gap:8px;
+        background:rgba(86,211,100,0.10);border:1px solid rgba(86,211,100,0.3);
+        border-radius:8px;padding:8px 14px;flex:1;transition:all 0.25s;
+      ">
+        <div id="ledVerdeCircle" style="
+          width:16px;height:16px;border-radius:50%;
+          background:var(--accent2);box-shadow:0 0 12px var(--accent2);
+          transition:all 0.25s;
+        "></div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--accent2)">
+          LED VERDE<br><span style="color:var(--text2)">Pino 12 — Normal</span>
+        </div>
+      </div>
+      <div id="ledVermelho" style="
+        display:flex;align-items:center;gap:8px;
+        background:rgba(248,81,73,0.06);border:1px solid rgba(248,81,73,0.2);
+        border-radius:8px;padding:8px 14px;flex:1;transition:all 0.25s;
+      ">
+        <div id="ledVermelhoCircle" style="
+          width:16px;height:16px;border-radius:50%;
+          background:#333;box-shadow:none;
+          transition:all 0.25s;
+        "></div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text2)">
+          LED VERMELHO<br><span style="color:var(--text2)">Pino 13 — Alerta</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Expressão booleana -->
+  <div class="card">
+    <div class="card-title">Expressão Lógica Booleana</div>
+    <div class="expr">
+<span class="kw-x">X</span> = (<span class="kw-and">A AND B</span>)
+  <span class="kw-or">OR</span> (<span class="kw-and">C AND D</span>)
+  <span class="kw-or">OR</span> (<span class="kw-and">E AND F</span>)
+  <span class="kw-or">OR</span> (<span class="kw-and">A AND <span class="kw-not">NOT</span> C</span>)
+    </div>
+    <div class="gates">
+      <div class="gate gate-and">AND (&amp;&amp;)</div>
+      <div class="gate gate-or">OR (||)</div>
+      <div class="gate gate-not">NOT (!)</div>
+    </div>
+    <div style="margin-top:1rem;font-size:11px;color:var(--text2);font-family:var(--mono);line-height:1.8">
+      <div>→ Falha comunicação + temperatura crítica</div>
+      <div>→ Baixa energia + módulo danificado</div>
+      <div>→ Instabilidade + alerta inteligente</div>
+      <div>→ Falha comunicação sem baixa energia (anomalia)</div>
+    </div>
+
+    <!-- Pinagem resumida — conforme Tinkercad -->
+    <div style="margin-top:1.25rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px">
+      <div style="font-size:10px;font-weight:700;letter-spacing:0.1em;color:var(--text2);font-family:var(--mono);margin-bottom:8px">PINAGEM — ARDUINO UNO</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-family:var(--mono);font-size:10px;color:var(--text2)">
+        <div><span style="color:var(--accent)">D2</span> → Botão A</div>
+        <div><span style="color:var(--accent)">D3</span> → Botão B</div>
+        <div><span style="color:var(--accent)">D4</span> → Botão C</div>
+        <div><span style="color:var(--accent)">D5</span> → Botão D</div>
+        <div><span style="color:var(--accent)">D6</span> → Botão E</div>
+        <div><span style="color:var(--accent)">D7</span> → Botão F</div>
+        <div><span style="color:var(--accent2)">D12</span> → LED Verde</div>
+        <div><span style="color:var(--danger)">D13</span> → LED Vermelho</div>
+      </div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text2);font-family:var(--mono)">Botões: INPUT_PULLUP · Resistores: 220Ω</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     BLOCO 15 · ABAS — CÓDIGO / TABELA VERDADE / CIRCUITO / SIM
+     ═══════════════════════════════════════════════════════════ -->
+<div class="sect-heading">Código, Tabela Verdade, Circuito e Simulador</div>
+
+<div class="full-card">
+  <div class="tabs">
+    <div class="tab active"  onclick="switchTab('code')">Código Arduino</div>
+    <div class="tab"         onclick="switchTab('tt')">Tabela Verdade</div>
+    <div class="tab"         onclick="switchTab('circuit')">Circuito</div>
+    <div class="tab"         onclick="switchTab('sim')">Simulador</div>
+  </div>
+
+  <!-- ─── ABA: CÓDIGO ───────────────────────────────────────── -->
+  <div class="panel active" id="panel-code">
+    <div style="margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:11px;color:var(--text2);font-family:var(--mono)">space_ops_alert.ino</span>
+      <button class="copy-btn" onclick="copyCode()">[ COPIAR ]</button>
+    </div>
+    <div class="code-block" id="codeBlock"></div>
+  </div>
+
+  <!-- ─── ABA: TABELA VERDADE ───────────────────────────────── -->
+  <div class="panel" id="panel-tt">
+    <div style="font-size:11px;color:var(--text2);font-family:var(--mono);margin-bottom:10px">
+      64 combinações (2⁶) · <span style="color:var(--danger)">vermelho = X=1 (alerta ativo)</span>
+    </div>
+    <div class="tt-scroll">
+      <table>
+        <thead>
+          <tr><th>A</th><th>B</th><th>C</th><th>D</th><th>E</th><th>F</th><th>X</th><th>STATUS</th></tr>
+        </thead>
+        <tbody id="ttBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ─── ABA: CIRCUITO ─────────────────────────────────────── -->
+  <div class="panel" id="panel-circuit">
+    <div style="font-size:11px;color:var(--text2);font-family:var(--mono);margin-bottom:10px">
+      Esquema de conexão Arduino Uno — pinos D2–D7 entradas (INPUT_PULLUP) ·
+      pino <strong style="color:var(--accent2)">D12</strong> LED verde ·
+      pino <strong style="color:var(--danger)">D13</strong> LED vermelho · resistores 220Ω
+    </div>
+
+    <!--
+      SVG ATUALIZADO conforme o Tinkercad:
+      – 6 botões (push) nos pinos D2–D7 com fios verdes
+      – LED vermelho no pino D13 (fio vermelho)
+      – LED verde   no pino D12 (fio verde)
+      – GND compartilhado em barramento laranja (fios laranja)
+      – Resistores 220Ω em série com cada LED
+    -->
+    <svg class="circuit-svg" viewBox="0 0 760 480" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrB" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+          <path d="M0,0 L6,3 L0,6 Z" fill="#388bfd" opacity="0.7"/>
+        </marker>
+        <marker id="arrG" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+          <path d="M0,0 L6,3 L0,6 Z" fill="#56d364" opacity="0.9"/>
+        </marker>
+        <marker id="arrR" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+          <path d="M0,0 L6,3 L0,6 Z" fill="#f85149" opacity="0.9"/>
+        </marker>
+        <marker id="arrO" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+          <path d="M0,0 L6,3 L0,6 Z" fill="#e3b341" opacity="0.8"/>
+        </marker>
+      </defs>
+
+      <!-- ── Arduino Board ── -->
+      <rect x="270" y="60" width="200" height="350" rx="10"
+            fill="#0d1525" stroke="#388bfd" stroke-width="1.5" opacity="0.95"/>
+      <text x="370" y="88" text-anchor="middle"
+            fill="#388bfd" font-family="Space Mono,monospace" font-size="10"
+            font-weight="700" letter-spacing="2">ARDUINO UNO</text>
+
+      <!-- ── Pinos digitais D2–D7 (lado esquerdo da placa) ── -->
+      <!-- D2 -->
+      <circle cx="268" cy="120" r="4" fill="#388bfd" opacity="0.85"/>
+      <text x="282" y="124" fill="#768390" font-family="Space Mono,monospace" font-size="9">D2</text>
+      <!-- D3 -->
+      <circle cx="268" cy="148" r="4" fill="#388bfd" opacity="0.85"/>
+      <text x="282" y="152" fill="#768390" font-family="Space Mono,monospace" font-size="9">D3</text>
+      <!-- D4 -->
+      <circle cx="268" cy="176" r="4" fill="#388bfd" opacity="0.85"/>
+      <text x="282" y="180" fill="#768390" font-family="Space Mono,monospace" font-size="9">D4</text>
+      <!-- D5 -->
+      <circle cx="268" cy="204" r="4" fill="#388bfd" opacity="0.85"/>
+      <text x="282" y="208" fill="#768390" font-family="Space Mono,monospace" font-size="9">D5</text>
+      <!-- D6 -->
+      <circle cx="268" cy="232" r="4" fill="#388bfd" opacity="0.85"/>
+      <text x="282" y="236" fill="#768390" font-family="Space Mono,monospace" font-size="9">D6</text>
+      <!-- D7 -->
+      <circle cx="268" cy="260" r="4" fill="#388bfd" opacity="0.85"/>
+      <text x="282" y="264" fill="#768390" font-family="Space Mono,monospace" font-size="9">D7</text>
+
+      <!-- ── Pinos de saída D12 (verde) e D13 (vermelho) ── -->
+      <!-- D12 -->
+      <circle cx="268" cy="310" r="4" fill="#56d364"/>
+      <text x="282" y="314" fill="#56d364" font-family="Space Mono,monospace" font-size="9">D12 (LED Verde)</text>
+      <!-- D13 -->
+      <circle cx="268" cy="338" r="4" fill="#f85149"/>
+      <text x="282" y="342" fill="#f85149" font-family="Space Mono,monospace" font-size="9">D13 (LED Vermelho)</text>
+
+      <!-- ── GND ── -->
+      <circle cx="268" cy="380" r="4" fill="#555"/>
+      <text x="282" y="384" fill="#768390" font-family="Space Mono,monospace" font-size="9">GND</text>
+
+      <!-- ════════════════════════════════════════
+           BOTÕES (lado direito) — pinos D2–D7
+           Fios verdes: pino → botão
+           Fios laranja: botão → barramento GND
+           ════════════════════════════════════════ -->
+
+      <!-- Barramento GND laranja (vertical direita) -->
+      <line x1="640" y1="110" x2="640" y2="420" stroke="#e3b341" stroke-width="2" opacity="0.6"/>
+      <text x="648" y="270" fill="#e3b341" font-family="Space Mono,monospace" font-size="8"
+            writing-mode="tb" letter-spacing="1">GND BUS</text>
+
+      <!-- Botão A — D2 -->
+      <rect x="510" y="108" width="48" height="24" rx="4"
+            fill="#0d1525" stroke="#56d364" stroke-width="1.2" opacity="0.9"/>
+      <text x="534" y="124" text-anchor="middle"
+            fill="#56d364" font-family="Space Mono,monospace" font-size="9" font-weight="700">BTN A</text>
+      <line x1="268" y1="120" x2="510" y2="120"
+            stroke="#56d364" stroke-width="1.2" stroke-dasharray="5,3" opacity="0.8" marker-end="url(#arrG)"/>
+      <line x1="558" y1="120" x2="640" y2="120"
+            stroke="#e3b341" stroke-width="1.2" opacity="0.7" marker-end="url(#arrO)"/>
+
+      <!-- Botão B — D3 -->
+      <rect x="510" y="136" width="48" height="24" rx="4"
+            fill="#0d1525" stroke="#56d364" stroke-width="1.2" opacity="0.9"/>
+      <text x="534" y="152" text-anchor="middle"
+            fill="#56d364" font-family="Space Mono,monospace" font-size="9" font-weight="700">BTN B</text>
+      <line x1="268" y1="148" x2="510" y2="148"
+            stroke="#56d364" stroke-width="1.2" stroke-dasharray="5,3" opacity="0.8" marker-end="url(#arrG)"/>
+      <line x1="558" y1="148" x2="640" y2="148"
+            stroke="#e3b341" stroke-width="1.2" opacity="0.7" marker-end="url(#arrO)"/>
+
+      <!-- Botão C — D4 -->
+      <rect x="510" y="164" width="48" height="24" rx="4"
+            fill="#0d1525" stroke="#56d364" stroke-width="1.2" opacity="0.9"/>
+      <text x="534" y="180" text-anchor="middle"
+            fill="#56d364" font-family="Space Mono,monospace" font-size="9" font-weight="700">BTN C</text>
+      <line x1="268" y1="176" x2="510" y2="176"
+            stroke="#56d364" stroke-width="1.2" stroke-dasharray="5,3" opacity="0.8" marker-end="url(#arrG)"/>
+      <line x1="558" y1="176" x2="640" y2="176"
+            stroke="#e3b341" stroke-width="1.2" opacity="0.7" marker-end="url(#arrO)"/>
+
+      <!-- Botão D — D5 -->
+      <rect x="510" y="192" width="48" height="24" rx="4"
+            fill="#0d1525" stroke="#56d364" stroke-width="1.2" opacity="0.9"/>
+      <text x="534" y="208" text-anchor="middle"
+            fill="#56d364" font-family="Space Mono,monospace" font-size="9" font-weight="700">BTN D</text>
+      <line x1="268" y1="204" x2="510" y2="204"
+            stroke="#56d364" stroke-width="1.2" stroke-dasharray="5,3" opacity="0.8" marker-end="url(#arrG)"/>
+      <line x1="558" y1="204" x2="640" y2="204"
+            stroke="#e3b341" stroke-width="1.2" opacity="0.7" marker-end="url(#arrO)"/>
+
+      <!-- Botão E — D6 -->
+      <rect x="510" y="220" width="48" height="24" rx="4"
+            fill="#0d1525" stroke="#56d364" stroke-width="1.2" opacity="0.9"/>
+      <text x="534" y="236" text-anchor="middle"
+            fill="#56d364" font-family="Space Mono,monospace" font-size="9" font-weight="700">BTN E</text>
+      <line x1="268" y1="232" x2="510" y2="232"
+            stroke="#56d364" stroke-width="1.2" stroke-dasharray="5,3" opacity="0.8" marker-end="url(#arrG)"/>
+      <line x1="558" y1="232" x2="640" y2="232"
+            stroke="#e3b341" stroke-width="1.2" opacity="0.7" marker-end="url(#arrO)"/>
+
+      <!-- Botão F — D7 -->
+      <rect x="510" y="248" width="48" height="24" rx="4"
+            fill="#0d1525" stroke="#56d364" stroke-width="1.2" opacity="0.9"/>
+      <text x="534" y="264" text-anchor="middle"
+            fill="#56d364" font-family="Space Mono,monospace" font-size="9" font-weight="700">BTN F</text>
+      <line x1="268" y1="260" x2="510" y2="260"
+            stroke="#56d364" stroke-width="1.2" stroke-dasharray="5,3" opacity="0.8" marker-end="url(#arrG)"/>
+      <line x1="558" y1="260" x2="640" y2="260"
+            stroke="#e3b341" stroke-width="1.2" opacity="0.7" marker-end="url(#arrO)"/>
+
+      <!-- ════════════════════════════════════════
+           LEDs — lado esquerdo da placa
+           LED Verde  : D12 → Resistor → LED → GND
+           LED Vermelho: D13 → Resistor → LED → GND
+           ════════════════════════════════════════ -->
+
+      <!-- Barramento GND laranja (esquerda) -->
+      <line x1="90" y1="295" x2="90" y2="420" stroke="#e3b341" stroke-width="2" opacity="0.6"/>
+
+      <!-- ─ LED Verde (D12) ─ -->
+      <!-- fio D12 → resistor -->
+      <line x1="268" y1="310" x2="190" y2="310"
+            stroke="#56d364" stroke-width="1.5" stroke-dasharray="5,3" opacity="0.85"/>
+      <!-- resistor -->
+      <rect x="150" y="303" width="40" height="14" rx="3"
+            fill="none" stroke="#768390" stroke-width="1.2"/>
+      <text x="170" y="328" text-anchor="middle"
+            fill="#768390" font-family="Space Mono,monospace" font-size="8">220Ω</text>
+      <!-- fio resistor → LED -->
+      <line x1="150" y1="310" x2="120" y2="310"
+            stroke="#56d364" stroke-width="1.5" opacity="0.85" marker-end="url(#arrG)"/>
+      <!-- LED verde (símbolo) -->
+      <circle cx="108" cy="310" r="10"
+              fill="rgba(86,211,100,0.15)" stroke="#56d364" stroke-width="1.5"/>
+      <text x="108" y="314" text-anchor="middle"
+            fill="#56d364" font-family="Space Mono,monospace" font-size="9" font-weight="700">▶</text>
+      <!-- fio LED → GND bus -->
+      <line x1="98" y1="310" x2="90" y2="310"
+            stroke="#e3b341" stroke-width="1.2" opacity="0.7"/>
+      <text x="62" y="314" fill="#56d364" font-family="Space Mono,monospace" font-size="8">LED</text>
+      <text x="62" y="324" fill="#56d364" font-family="Space Mono,monospace" font-size="8">VERDE</text>
+
+      <!-- ─ LED Vermelho (D13) ─ -->
+      <!-- fio D13 → resistor -->
+      <line x1="268" y1="338" x2="190" y2="338"
+            stroke="#f85149" stroke-width="1.5" stroke-dasharray="5,3" opacity="0.85"/>
+      <!-- resistor -->
+      <rect x="150" y="331" width="40" height="14" rx="3"
+            fill="none" stroke="#768390" stroke-width="1.2"/>
+      <text x="170" y="356" text-anchor="middle"
+            fill="#768390" font-family="Space Mono,monospace" font-size="8">220Ω</text>
+      <!-- fio resistor → LED -->
+      <line x1="150" y1="338" x2="120" y2="338"
+            stroke="#f85149" stroke-width="1.5" opacity="0.85" marker-end="url(#arrR)"/>
+      <!-- LED vermelho (símbolo) -->
+      <circle cx="108" cy="338" r="10"
+              fill="rgba(248,81,73,0.12)" stroke="#f85149" stroke-width="1.5"/>
+      <text x="108" y="342" text-anchor="middle"
+            fill="#f85149" font-family="Space Mono,monospace" font-size="9" font-weight="700">▶</text>
+      <!-- fio LED → GND bus -->
+      <line x1="98" y1="338" x2="90" y2="338"
+            stroke="#e3b341" stroke-width="1.2" opacity="0.7"/>
+      <text x="54" y="342" fill="#f85149" font-family="Space Mono,monospace" font-size="8">LED</text>
+      <text x="48" y="352" fill="#f85149" font-family="Space Mono,monospace" font-size="8">VERMELHO</text>
+
+      <!-- GND da placa → barramento esquerdo e direito -->
+      <line x1="268" y1="380" x2="90" y2="380"
+            stroke="#e3b341" stroke-width="1.5" opacity="0.6"/>
+      <line x1="90" y1="380" x2="90" y2="420"
+            stroke="#e3b341" stroke-width="1.5" opacity="0.6"/>
+      <line x1="640" y1="380" x2="640" y2="420"
+            stroke="#e3b341" stroke-width="1.5" opacity="0.6"/>
+      <!-- Conexão GND direita com Arduino -->
+      <line x1="268" y1="380" x2="640" y2="380"
+            stroke="#e3b341" stroke-width="1" stroke-dasharray="4,4" opacity="0.35"/>
+
+      <!-- Legenda -->
+      <text x="380" y="460" text-anchor="middle"
+            fill="#768390" font-family="Space Mono,monospace" font-size="9">
+        Botões: D2–D7 INPUT_PULLUP · LED Verde: D12 · LED Vermelho: D13 · Resistores: 220Ω
+      </text>
+    </svg>
+  </div>
+
+  <!-- ─── ABA: SIMULADOR (TINKERCAD) ───────────────────────── -->
+  <div class="panel" id="panel-sim">
+    <div style="font-size:11px;color:var(--text2);font-family:var(--mono);margin-bottom:14px">
+      Simulação completa do circuito no Tinkercad — clique para abrir e interagir online
+    </div>
+    <a href="https://www.tinkercad.com/things/j9Zt7EHiou7-simulacao-do-arduino-?sharecode=ujqH-ccnOJKTlGm8PsMMg2GcHFgsN-8JXA4eYgBcF7E"
+       target="_blank"
+       style="display:block;text-decoration:none;position:relative;border-radius:10px;overflow:hidden;border:1px solid rgba(56,139,253,0.3);transition:border-color 0.2s"
+       onmouseover="this.style.borderColor='rgba(56,139,253,0.7)'"
+       onmouseout="this.style.borderColor='rgba(56,139,253,0.3)'">
+      <div style="background:rgba(8,12,20,0.6);padding:60px 0;display:flex;align-items:center;justify-content:center;border-radius:10px">
+        <div style="background:rgba(56,139,253,0.15);border:1.5px solid var(--accent);border-radius:10px;padding:24px 40px;text-align:center;backdrop-filter:blur(6px)">
+          <div style="font-size:36px;margin-bottom:10px">🔧</div>
+          <div style="font-family:var(--mono);font-weight:700;font-size:14px;color:#fff;letter-spacing:0.06em">ABRIR NO TINKERCAD</div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--text2);margin-top:6px">Simulação interativa completa</div>
+          <div style="margin-top:10px;font-family:var(--mono);font-size:9px;color:var(--text2)">
+            6× Botões (D2–D7) · LED Verde (D12) · LED Vermelho (D13)
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+
+</div><!-- /full-card -->
+</main>
+
+<!-- ═══════════════════════════════════════════════════════════
+     BLOCO 16 · JAVASCRIPT — LÓGICA, TABELA VERDADE E CÓDIGO
+     ═══════════════════════════════════════════════════════════ -->
+<script>
+/* ── Estado das variáveis ── */
+var st = {A:0, B:0, C:0, D:0, E:0, F:0};
+
+/* ── Função booleana (espelha exatamente o Arduino) ── */
+function evalX(a,b,c,d,e,f){
+  return ((a&&b)||(c&&d)||(e&&f)||(a&&!c)) ? 1 : 0;
+}
+
+/* ── Toggle de cada botão no simulador ── */
+function toggle(v){
+  st[v] = st[v] ? 0 : 1;
+  document.getElementById('val'+v).textContent = st[v];
+  document.getElementById('chip'+v).className = 'var-chip' + (st[v] ? ' active' : '');
+  update();
+}
+
+/* ── Atualiza painel de alerta e LEDs ── */
+function update(){
+  var x = evalX(st.A, st.B, st.C, st.D, st.E, st.F);
+  var panel  = document.getElementById('alertPanel');
+  var txt    = document.getElementById('alertText');
+  var sub    = document.getElementById('alertSub');
+  var xv     = document.getElementById('xValue');
+
+  /* LED Verde: aceso quando X=0 (normal) */
+  var lvc  = document.getElementById('ledVerdeCircle');
+  var lvEl = document.getElementById('ledVerde');
+
+  /* LED Vermelho: aceso quando X=1 (alerta) */
+  var lrc  = document.getElementById('ledVermelhoCircle');
+  var lrEl = document.getElementById('ledVermelho');
+
+  if(x){
+    panel.className = 'alert-panel alert-on';
+    txt.textContent = 'ALERTA CRÍTICO DETECTADO';
+    sub.textContent = 'Condição de risco ativa — X = 1';
+    xv.textContent  = 'X=1';
+
+    /* LED Vermelho ACESO */
+    lrc.style.background  = 'var(--danger)';
+    lrc.style.boxShadow   = '0 0 14px var(--danger)';
+    lrEl.style.borderColor= 'rgba(248,81,73,0.6)';
+    lrEl.style.background = 'rgba(248,81,73,0.12)';
+    lrEl.querySelector('div:last-child span').style.color = 'var(--danger)';
+
+    /* LED Verde APAGADO */
+    lvc.style.background  = '#1a2a1a';
+    lvc.style.boxShadow   = 'none';
+    lvEl.style.borderColor= 'rgba(86,211,100,0.15)';
+    lvEl.style.background = 'rgba(86,211,100,0.03)';
+  } else {
+    panel.className = 'alert-panel alert-ok';
+    txt.textContent = 'Operação Normal';
+    sub.textContent = 'Nenhuma condição crítica detectada';
+    xv.textContent  = 'X=0';
+
+    /* LED Verde ACESO */
+    lvc.style.background  = 'var(--accent2)';
+    lvc.style.boxShadow   = '0 0 12px var(--accent2)';
+    lvEl.style.borderColor= 'rgba(86,211,100,0.4)';
+    lvEl.style.background = 'rgba(86,211,100,0.10)';
+
+    /* LED Vermelho APAGADO */
+    lrc.style.background  = '#2a1a1a';
+    lrc.style.boxShadow   = 'none';
+    lrEl.style.borderColor= 'rgba(248,81,73,0.15)';
+    lrEl.style.background = 'rgba(248,81,73,0.03)';
+  }
+}
+
+/* ── Troca de abas ── */
+function switchTab(id){
+  var ids = ['code','tt','circuit','sim'];
+  document.querySelectorAll('.tab').forEach(function(t,i){
+    t.className = 'tab' + (ids[i]===id ? ' active' : '');
+  });
+  document.querySelectorAll('.panel').forEach(function(p){
+    p.className = 'panel';
+  });
+  document.getElementById('panel-'+id).className = 'panel active';
+}
+
+/* ── Constrói a Tabela Verdade (64 linhas) ── */
+function buildTT(){
+  var html = '';
+  for(var i=0; i<64; i++){
+    var a=(i>>5)&1, b=(i>>4)&1, c=(i>>3)&1, d=(i>>2)&1, e=(i>>1)&1, f=i&1;
+    var x = evalX(a,b,c,d,e,f);
+    var cls = x ? ' class="alert"' : '';
+    html += '<tr'+cls+'>';
+    html += '<td>'+a+'</td><td>'+b+'</td><td>'+c+'</td>';
+    html += '<td>'+d+'</td><td>'+e+'</td><td>'+f+'</td>';
+    html += '<td class="xcell">'+x+'</td>';
+    html += '<td style="font-size:10px">'+(x?'🔴 ALERTA':'🟢 Normal')+'</td>';
+    html += '</tr>';
+  }
+  document.getElementById('ttBody').innerHTML = html;
+}
+
+/* ── Constrói o bloco de código Arduino ──
+   PINAGEM CORRIGIDA conforme Tinkercad:
+   – Botões : D2–D7 (INPUT_PULLUP)
+   – LED Verde   : D12
+   – LED Vermelho: D13
+── */
+function buildCode(){
+  var c = '';
+  c += '<span class="cm">// ════════════════════════════════════════════</span>\n';
+  c += '<span class="cm">// Space Operations Dashboard</span>\n';
+  c += '<span class="cm">// Ciências da Computação — Turma 1CC AGO</span>\n';
+  c += '<span class="cm">// Prof. Mauricio Neto</span>\n';
+  c += '<span class="cm">// João Carmo RM567030 · Luiz Gustavo RM566613</span>\n';
+  c += '<span class="cm">// ════════════════════════════════════════════</span>\n\n';
+
+  c += '<span class="cm">// ── Pinos de entrada (botões) ──────────────</span>\n';
+  c += '<span class="kw">const int</span> <span class="fn">pinA</span> = <span class="num">2</span>;  <span class="cm">// Falha de comunicação</span>\n';
+  c += '<span class="kw">const int</span> <span class="fn">pinB</span> = <span class="num">3</span>;  <span class="cm">// Temperatura crítica</span>\n';
+  c += '<span class="kw">const int</span> <span class="fn">pinC</span> = <span class="num">4</span>;  <span class="cm">// Baixo nível de energia</span>\n';
+  c += '<span class="kw">const int</span> <span class="fn">pinD</span> = <span class="num">5</span>;  <span class="cm">// Falha em módulo operacional</span>\n';
+  c += '<span class="kw">const int</span> <span class="fn">pinE</span> = <span class="num">6</span>;  <span class="cm">// Instabilidade da nave</span>\n';
+  c += '<span class="kw">const int</span> <span class="fn">pinF</span> = <span class="num">7</span>;  <span class="cm">// Alerta sistema inteligente</span>\n\n';
+
+  c += '<span class="cm">// ── Pinos de saída (LEDs) ──────────────────</span>\n';
+  c += '<span class="kw">const int</span> <span class="fn">pinLedVerde</span>    = <span class="num">12</span>; <span class="cm">// LED Verde   — Operação normal</span>\n';
+  c += '<span class="kw">const int</span> <span class="fn">pinLedVermelho</span> = <span class="num">13</span>; <span class="cm">// LED Vermelho — Alerta crítico</span>\n\n';
+
+  c += '<span class="cm">// ── Configuração ───────────────────────────</span>\n';
+  c += '<span class="kw">void</span> <span class="fn">setup</span>() {\n';
+  c += '  <span class="cm">// Entradas com pull-up interno (botão ao GND)</span>\n';
+  c += '  <span class="fn">pinMode</span>(pinA, INPUT_PULLUP);\n';
+  c += '  <span class="fn">pinMode</span>(pinB, INPUT_PULLUP);\n';
+  c += '  <span class="fn">pinMode</span>(pinC, INPUT_PULLUP);\n';
+  c += '  <span class="fn">pinMode</span>(pinD, INPUT_PULLUP);\n';
+  c += '  <span class="fn">pinMode</span>(pinE, INPUT_PULLUP);\n';
+  c += '  <span class="fn">pinMode</span>(pinF, INPUT_PULLUP);\n\n';
+  c += '  <span class="cm">// Saídas dos LEDs</span>\n';
+  c += '  <span class="fn">pinMode</span>(pinLedVerde,    OUTPUT);\n';
+  c += '  <span class="fn">pinMode</span>(pinLedVermelho, OUTPUT);\n\n';
+  c += '  <span class="cm">// Estado inicial: LED verde aceso (sistema normal)</span>\n';
+  c += '  <span class="fn">digitalWrite</span>(pinLedVerde,    HIGH);\n';
+  c += '  <span class="fn">digitalWrite</span>(pinLedVermelho, LOW);\n\n';
+  c += '  <span class="fn">Serial</span>.begin(<span class="num">9600</span>);\n';
+  c += '}\n\n';
+
+  c += '<span class="cm">// ── Loop principal ─────────────────────────</span>\n';
+  c += '<span class="kw">void</span> <span class="fn">loop</span>() {\n';
+  c += '  <span class="cm">// Leitura das entradas (LOW = pressionado com INPUT_PULLUP)</span>\n';
+  c += '  <span class="kw">bool</span> A = !<span class="fn">digitalRead</span>(pinA);\n';
+  c += '  <span class="kw">bool</span> B = !<span class="fn">digitalRead</span>(pinB);\n';
+  c += '  <span class="kw">bool</span> C = !<span class="fn">digitalRead</span>(pinC);\n';
+  c += '  <span class="kw">bool</span> D = !<span class="fn">digitalRead</span>(pinD);\n';
+  c += '  <span class="kw">bool</span> E = !<span class="fn">digitalRead</span>(pinE);\n';
+  c += '  <span class="kw">bool</span> F = !<span class="fn">digitalRead</span>(pinF);\n\n';
+  c += '  <span class="cm">// Expressão booleana do sistema de alerta</span>\n';
+  c += '  <span class="cm">// X = (A∧B) ∨ (C∧D) ∨ (E∧F) ∨ (A∧¬C)</span>\n';
+  c += '  <span class="kw">bool</span> X = (A && B) || (C && D) || (E && F) || (A && !C);\n\n';
+  c += '  <span class="cm">// Aciona LEDs conforme resultado</span>\n';
+  c += '  <span class="fn">digitalWrite</span>(pinLedVermelho, X ? HIGH : LOW); <span class="cm">// D13</span>\n';
+  c += '  <span class="fn">digitalWrite</span>(pinLedVerde,    X ? LOW  : HIGH); <span class="cm">// D12</span>\n\n';
+  c += '  <span class="cm">// Monitor serial para depuração</span>\n';
+  c += '  <span class="fn">Serial</span>.print(<span class="str">"A="</span>); <span class="fn">Serial</span>.print(A);\n';
+  c += '  <span class="fn">Serial</span>.print(<span class="str">" B="</span>); <span class="fn">Serial</span>.print(B);\n';
+  c += '  <span class="fn">Serial</span>.print(<span class="str">" C="</span>); <span class="fn">Serial</span>.print(C);\n';
+  c += '  <span class="fn">Serial</span>.print(<span class="str">" D="</span>); <span class="fn">Serial</span>.print(D);\n';
+  c += '  <span class="fn">Serial</span>.print(<span class="str">" E="</span>); <span class="fn">Serial</span>.print(E);\n';
+  c += '  <span class="fn">Serial</span>.print(<span class="str">" F="</span>); <span class="fn">Serial</span>.print(F);\n';
+  c += '  <span class="fn">Serial</span>.print(<span class="str">" | X="</span>); <span class="fn">Serial</span>.print(X);\n';
+  c += '  <span class="fn">Serial</span>.println(X ? <span class="str">" [ALERTA]"</span> : <span class="str">" [Normal]"</span>);\n\n';
+  c += '  <span class="fn">delay</span>(<span class="num">200</span>);\n';
+  c += '}';
+  document.getElementById('codeBlock').innerHTML = c;
+}
+
+/* ── Copia código limpo para o clipboard ── */
+function copyCode(){
+  var raw = `// ════════════════════════════════════════════
+// Space Operations Dashboard
+// Ciências da Computação — Turma 1CC AGO
+// Prof. Mauricio Neto
+// João Carmo RM567030 · Luiz Gustavo RM566613
+// ════════════════════════════════════════════
+
+// ── Pinos de entrada (botões) ──────────────
+const int pinA = 2;  // Falha de comunicação
+const int pinB = 3;  // Temperatura crítica
+const int pinC = 4;  // Baixo nível de energia
+const int pinD = 5;  // Falha em módulo operacional
+const int pinE = 6;  // Instabilidade da nave
+const int pinF = 7;  // Alerta sistema inteligente
+
+// ── Pinos de saída (LEDs) ──────────────────
+const int pinLedVerde    = 12; // LED Verde   — Operação normal
+const int pinLedVermelho = 13; // LED Vermelho — Alerta crítico
+
+// ── Configuração ───────────────────────────
+void setup() {
+  // Entradas com pull-up interno (botão ao GND)
+  pinMode(pinA, INPUT_PULLUP);
+  pinMode(pinB, INPUT_PULLUP);
+  pinMode(pinC, INPUT_PULLUP);
+  pinMode(pinD, INPUT_PULLUP);
+  pinMode(pinE, INPUT_PULLUP);
+  pinMode(pinF, INPUT_PULLUP);
+
+  // Saídas dos LEDs
+  pinMode(pinLedVerde,    OUTPUT);
+  pinMode(pinLedVermelho, OUTPUT);
+
+  // Estado inicial: LED verde aceso (sistema normal)
+  digitalWrite(pinLedVerde,    HIGH);
+  digitalWrite(pinLedVermelho, LOW);
+
+  Serial.begin(9600);
+}
+
+// ── Loop principal ─────────────────────────
+void loop() {
+  // Leitura das entradas (LOW = pressionado com INPUT_PULLUP)
+  bool A = !digitalRead(pinA);
+  bool B = !digitalRead(pinB);
+  bool C = !digitalRead(pinC);
+  bool D = !digitalRead(pinD);
+  bool E = !digitalRead(pinE);
+  bool F = !digitalRead(pinF);
+
+  // Expressão booleana do sistema de alerta
+  // X = (A∧B) ∨ (C∧D) ∨ (E∧F) ∨ (A∧¬C)
+  bool X = (A && B) || (C && D) || (E && F) || (A && !C);
+
+  // Aciona LEDs conforme resultado
+  digitalWrite(pinLedVermelho, X ? HIGH : LOW); // D13
+  digitalWrite(pinLedVerde,    X ? LOW  : HIGH); // D12
+
+  // Monitor serial para depuração
+  Serial.print("A="); Serial.print(A);
+  Serial.print(" B="); Serial.print(B);
+  Serial.print(" C="); Serial.print(C);
+  Serial.print(" D="); Serial.print(D);
+  Serial.print(" E="); Serial.print(E);
+  Serial.print(" F="); Serial.print(F);
+  Serial.print(" | X="); Serial.print(X);
+  Serial.println(X ? " [ALERTA]" : " [Normal]");
+
+  delay(200);
+}`;
+
+  navigator.clipboard.writeText(raw).then(function(){
+    var btn = document.querySelector('.copy-btn');
+    btn.textContent = '[ COPIADO! ]';
+    btn.style.color = '#56d364';
+    setTimeout(function(){ btn.textContent='[ COPIAR ]'; btn.style.color=''; }, 2000);
+  });
+}
+
+/* ── Inicialização ── */
+buildTT();
+buildCode();
+update(); // garante estado inicial correto dos LEDs
+</script>
+</body>
+</html>
